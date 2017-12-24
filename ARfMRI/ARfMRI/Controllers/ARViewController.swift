@@ -12,45 +12,77 @@ import ARKit
 
 final class ViewController: UIViewController {
 
-    // UI
-    @IBOutlet private var sceneView: ARSCNView!
+    @IBOutlet private var sceneView: SCNView!
 
-    // Geometry
-    var geometryNode: SCNNode = SCNNode()
+    private let voxelSize: CGFloat = 1.0
 
-    // Gestures
-    var currentAngle: Float = 0.0
+    private var fmriVoxels: [[[Pixel]]] = [] {
+        didSet {
+            let scene = SCNScene()
 
+            for z in 0..<fmriVoxels.count {
+                for y in 0..<(fmriVoxels.first?.count ?? 0) {
+                    for x in 0..<(fmriVoxels.first?.first?.count ?? 0) {
+                        let voxel = fmriVoxels[z][y][x]
+                        if voxel.alpha == 0 {
+                            // skip entirely transparent voxels
+                            continue
+                        }
+
+                        let voxelTexture = SCNMaterial()
+                        voxelTexture.diffuse.contents = voxel.toUIColor()
+
+                        let voxelGeometry = SCNBox(width: voxelSize, height: voxelSize, length: voxelSize, chamferRadius: voxelSize/10)
+                        voxelGeometry.widthSegmentCount = 1
+                        voxelGeometry.heightSegmentCount = 1
+                        voxelGeometry.lengthSegmentCount = 1
+                        voxelGeometry.firstMaterial = voxelTexture
+
+                        let voxelNode = SCNNode(geometry: voxelGeometry)
+                        voxelNode.position.x = Float(x)*Float(voxelSize)
+                        voxelNode.position.y = Float(y)*Float(voxelSize)
+                        voxelNode.position.z = Float(z)*Float(voxelSize)
+
+                        scene.rootNode.addChildNode(voxelNode)
+                    }
+                }
+            }
+
+            sceneView.scene = scene
+        }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        // Set the view's delegate
-        sceneView.delegate = self
-        
-        // Show statistics such as fps and timing information
-        sceneView.showsStatistics = true
 
-        // Setup scene.
-        setupScene()
+        setupSceneView()
+
+        // Load data
+        guard let fmriSlices = loadFMRISlices(fromPath: "math_vs_baseline") else {
+            print("Could not retrieve fMRIImages.")
+            return
+        }
+
+        // Process data for volume rendering
+        fmriVoxels = FMRIUtils.processSlicesForVolumeRendering(fmriSlices)
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
         // Create a session configuration
-        let configuration = ARWorldTrackingConfiguration()
-        configuration.planeDetection = .horizontal
+//        let configuration = ARWorldTrackingConfiguration()
+//        configuration.planeDetection = .horizontal
 
         // Run the view's session
-        sceneView.session.run(configuration)
+//        sceneView.session.run(configuration)
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         
         // Pause the view's session
-        sceneView.session.pause()
+//        sceneView.session.pause()
     }
     
     override func didReceiveMemoryWarning() {
@@ -58,65 +90,35 @@ final class ViewController: UIViewController {
         // Release any cached data, images, etc that aren't in use.
     }
 
-    private func setupScene() {
-        let scene = SCNScene()
+    private func setupSceneView() {
+        // Set the view's delegate
+//        sceneView.delegate = self
+        sceneView.allowsCameraControl = true
 
-        // Load fMRI data.
-        guard let fMRIImages = loadfMRIImages(fromPath: "output-slice") else {
-            print("Could not retrieve fMRIImages.")
-            return
-        }
+        // Show statistics such as fps and timing information
+        sceneView.showsStatistics = true
 
-        // Add each image as a slice.
-        for (i, image) in fMRIImages.enumerated() {
-            let planeGeometry = SCNPlane(width: 0.2, height: 0.2)
-            planeGeometry.firstMaterial?.diffuse.contents = image
-
-            let planeNode = SCNNode(geometry: planeGeometry)
-            planeNode.position.z = -1.0 + Float(i) * 0.01
-            scene.rootNode.addChildNode(planeNode)
-        }
-
-        // Add gesture recognizer
-//        let panRecognizer = UIPanGestureRecognizer(target: self, action: Selector(("panGesture:")))
-//        sceneView.addGestureRecognizer(panRecognizer)
-
-        sceneView.scene = scene
+        sceneView.backgroundColor = .white
+        sceneView.autoenablesDefaultLighting = true
     }
 
-    private func loadfMRIImages(fromPath path: String) -> [UIImage]? {
-        var images = [UIImage]()
-        for i in 1...45 {
+    private func loadFMRISlices(fromPath path: String) -> [RGBAImage]? {
+        var images = [RGBAImage]()
+        for i in 0...45 {
             let imageFileName = String(format: "\(path)%03d.jpg", i)
             guard let image = UIImage(named: imageFileName) else {
                 return nil
             }
-            guard var rgbaImage = RGBAImage(image: image) else {
+            guard let rgbaImage = RGBAImage(image: image) else {
                 return nil
             }
-            FMRIUtils.processImageForVolumeRendering(&rgbaImage)
-            guard let processedImage = rgbaImage.toUIImage() else {
-                return nil
-            }
-            images.append(processedImage)
+            images.append(rgbaImage)
         }
         return images
     }
-//
-//    func panGesture(sender: UIPanGestureRecognizer) {
-//        let translation = sender.translation(in: sender.view!)
-//        var newAngle = (Float)(translation.x)*Float.pi/180.0
-//        newAngle += currentAngle
-//
-//        geometryNode.transform = SCNMatrix4MakeRotation(newAngle, 0, 1, 0)
-//
-//        if sender.state == .ended {
-//            currentAngle = newAngle
-//        }
-//    }
 }
 
-
+/*
 extension ViewController: ARSCNViewDelegate {
 
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
@@ -159,3 +161,4 @@ extension ViewController: ARSCNViewDelegate {
         print("session interruption ended")
     }
 }
+*/

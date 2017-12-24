@@ -9,13 +9,38 @@
 import Foundation
 
 struct FMRIUtils {
-    static func processImageForVolumeRendering(_ inputImage: inout RGBAImage) {
-        for i in 0..<inputImage.pixels.count {
-            print("RED: \(inputImage.pixels[i].red) GREEN: \(inputImage.pixels[i].green) BLUE: \(inputImage.pixels[i].blue) ALPHA: \(inputImage.pixels[i].alpha)")
-            inputImage.pixels[i].alpha = 128
-//            inputImage.pixels[i].red = 0
-//            inputImage.pixels[i].green = 0
-//            inputImage.pixels[i].blue = 0
+    
+    static func processSlicesForVolumeRendering(_ slices: [RGBAImage]) -> [[[Pixel]]] {
+        var voxels = [[[Pixel]]]()
+        for slice in slices {
+            var voxelsForSlice = [[Pixel]]()
+            
+            var sampleBoundaryPixel = slice.pixels[1*slice.width + 1]
+            let boundaryThreshold = 1
+            for y in 0..<slice.height {
+                var voxelsForRow = [Pixel]()
+                
+                for x in 0..<slice.width {
+                    var origPixel = slice.pixels[y*slice.width + x]
+
+                    if abs(Int(origPixel.red) - Int(sampleBoundaryPixel.red)) < boundaryThreshold &&
+                        abs(Int(origPixel.green) - Int(sampleBoundaryPixel.green)) < boundaryThreshold &&
+                        abs(Int(origPixel.blue) - Int(sampleBoundaryPixel.blue)) < boundaryThreshold {
+                        origPixel.alpha = 10
+                    } else {
+                        origPixel.alpha = 30
+                    }
+                    voxelsForRow.append(origPixel)
+                }
+                
+                voxelsForSlice.append(voxelsForRow)
+            }
+            
+            voxels.append(voxelsForSlice)
         }
+        
+        return voxels
     }
+    
+    
 }

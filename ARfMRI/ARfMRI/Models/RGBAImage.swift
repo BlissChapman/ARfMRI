@@ -28,6 +28,10 @@ struct Pixel {
         get { return UInt8((value >> 24) & 0xFF) }
         set { value = (UInt32(newValue) << 24) | (value & 0x00FFFFFF) }
     }
+
+    func toUIColor() -> UIColor {
+        return UIColor(red: CGFloat(red)/255.0, green: CGFloat(green)/255.0, blue: CGFloat(blue)/255.0, alpha: CGFloat(alpha)/255.0)
+    }
 }
 
 struct RGBAImage {
